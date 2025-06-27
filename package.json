@@ -1,0 +1,24 @@
+{
+  "name": "notion-tree-generator",
+  "version": "1.0.0",
+  "description": "Generate a tree structure of Notion pages",
+  "main": "cli.js",
+  "type": "module",
+  "bin": {
+    "notion-tree": "cli.js"
+  },
+  "scripts": {
+    "start": "node cli.js",
+    "export": "node export-tree.js",
+    "cli": "node cli.js"
+  },
+  "keywords": ["notion", "tree", "structure", "cli"],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.11.0",
+  "dependencies": {
+    "@notionhq/client": "3.1.3",
+    "chalk": "5.4.1",
+    "dotenv": "16.6.0"
+  }
+}
