@@ -12,6 +12,7 @@ This tool generates a tree-like structure of your Notion pages, similar to a Win
 - Export clean ASCII tree format in Markdown files (similar to console output)
 - Includes page URLs in exported files for easy navigation
 - Command-line interface with various options
+- Visual progress indicators with spinner animation during generation
 
 ## Prerequisites
 
@@ -84,6 +85,7 @@ pnpm cli [options]
 - `-d, --max-depth`: Maximum depth to traverse (default: unlimited)
 - `-u, --include-urls`: Include URLs in the output (default: false)
 - `-a, --ascii`: Generate an ASCII tree markdown file (similar to console output)
+- `-q, --quiet`: Suppress progress indicators and animations
 
 #### Examples:
 
@@ -108,6 +110,9 @@ pnpm cli -a
 
 # Generate all export formats including ASCII tree
 pnpm cli -f all -a
+
+# Run without progress indicators
+pnpm cli -q
 ```
 
 ### Global Installation
@@ -124,12 +129,28 @@ Then use the command:
 notion-tree [options]
 ```
 
+## Progress Indicators
+
+During tree generation, the tool displays progress indicators to provide feedback:
+
+- A spinner animation shows that the process is ongoing
+- Status messages indicate the current operation being performed
+- Page/database counters show how many items have been processed
+- Percentage completion is displayed for operations with known total items
+
+These indicators help make the process more engaging and informative, especially for large workspaces where tree generation might take some time.
+
+If you prefer not to see these indicators, use the `-q` or `--quiet` option.
+
 ## Example Output
 
 ### Console and ASCII Tree Output
 
 ```
 🔍 Generating Notion page tree...
+Found 5 root items. Building tree structure...
+✅ Tree structure built successfully!
+🌳 Displaying tree structure:
 ├── My Workspace (Database)
 │   ├── Project A
 │   │   └── Tasks

@@ -4,6 +4,15 @@ import fs from 'fs/promises';
 import path from 'path';
 import chalk from 'chalk';
 
+// Loading animation frames
+const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+let frameIndex = 0;
+let spinnerInterval;
+let currentStatusMessage = '';
+let processedItems = 0;
+let totalItems = 0;
+let isSpinnerActive = false;
+
 // Load environment variables
 dotenv.config();
 
@@ -27,33 +36,112 @@ class TreeNode {
   }
 }
 
+// Start spinner animation
+function startSpinner(initialMessage = 'Processing...') {
+  currentStatusMessage = initialMessage;
+  isSpinnerActive = true;
+  
+  // Clear the current line before starting
+  process.stdout.write('\r\x1b[K');
+  
+  spinnerInterval = setInterval(() => {
+    const frame = frames[frameIndex];
+    frameIndex = (frameIndex + 1) % frames.length;
+    
+    // Build progress message
+    let progressMessage = '';
+    if (totalItems > 0) {
+      const percentage = Math.round((processedItems / totalItems) * 100);
+      progressMessage = `[${processedItems}/${totalItems}, ${percentage}%] `;
+    }
+    
+    // Clear the current line and update with new spinner frame and message
+    process.stdout.write(`\r${chalk.cyan(frame)} ${progressMessage}${currentStatusMessage}`);
+  }, 80);
+}
+
+// Update spinner message
+function updateSpinnerMessage(message) {
+  currentStatusMessage = message;
+}
+
+// Update progress counter
+function updateProgressCounter(processed, total = null) {
+  processedItems = processed;
+  if (total !== null) {
+    totalItems = total;
+  }
+}
+
+// Stop spinner animation
+function stopSpinner(finalMessage = null) {
+  if (!isSpinnerActive) return;
+  
+  clearInterval(spinnerInterval);
+  isSpinnerActive = false;
+  
+  // Clear the current line
+  process.stdout.write('\r\x1b[K');
+  
+  // Print final message if provided
+  if (finalMessage) {
+    console.log(finalMessage);
+  }
+}
+
 // Main function to generate and export the tree
 async function exportNotionTree() {
   try {
     console.log(chalk.blue('🔍 Generating Notion page tree...'));
     
+    // Start spinner for fetching root items
+    startSpinner('Searching for workspace pages and databases...');
+    
     // Get all pages and databases at the workspace level first
     const rootNodes = await fetchRootItems();
     
+    stopSpinner();
     console.log(chalk.blue(`Found ${rootNodes.length} root items. Building tree structure...`));
+    
+    // Reset counters for the tree building phase
+    processedItems = 0;
+    totalItems = rootNodes.length;
+    
+    // Start spinner for building the tree
+    startSpinner('Building tree structure...');
     
     // Process each root node to build the tree
     const tree = [];
-    for (const rootNode of rootNodes) {
+    for (let i = 0; i < rootNodes.length; i++) {
+      const rootNode = rootNodes[i];
+      updateSpinnerMessage(`Processing ${chalk.green(rootNode.title)}...`);
       const node = await buildTreeRecursively(rootNode);
       tree.push(node);
+      updateProgressCounter(i + 1);
     }
     
+    stopSpinner(chalk.blue('✅ Tree structure built successfully!'));
+    
     // Display the tree
+    console.log(chalk.blue('🌳 Displaying tree structure:'));
     displayTree(tree);
     
     // Export the tree to files
+    startSpinner('Generating Markdown export...');
     await exportTreeToMarkdown(tree);
+    stopSpinner();
+    
+    startSpinner('Generating ASCII tree export...');
     await exportTreeToASCIIMarkdown(tree);
+    stopSpinner();
+    
+    startSpinner('Generating JSON export...');
     await exportTreeToJSON(tree);
+    stopSpinner();
     
     console.log(chalk.green('✅ Tree generation and export complete!'));
   } catch (error) {
+    stopSpinner();
     console.error(chalk.red('Error generating tree:'), error.message);
     if (error.code === 'unauthorized') {
       console.error(chalk.yellow('Make sure your Notion API key is correct and the integration has the necessary permissions.'));
@@ -64,58 +152,79 @@ async function exportNotionTree() {
 // Fetch root-level pages and databases
 async function fetchRootItems() {
   const rootItems = [];
+  let pagesProcessed = 0;
   
-  // Search for all pages the integration has access to
-  const response = await notion.search({
-    filter: {
-      value: 'page',
-      property: 'object'
-    },
-    page_size: 100,
-  });
-  
-  // Filter for only workspace-level pages (no parent page)
-  for (const result of response.results) {
-    if (result.parent.type === 'workspace') {
-      const title = getPageTitle(result);
-      rootItems.push({
-        id: result.id,
-        title,
-        type: result.object,
-        parent: result.parent,
-        url: result.url,
-      });
+  try {
+    // Search for all pages the integration has access to
+    updateSpinnerMessage('Searching for pages...');
+    const response = await notion.search({
+      filter: {
+        value: 'page',
+        property: 'object'
+      },
+      page_size: 100,
+    });
+    
+    // Filter for only workspace-level pages (no parent page)
+    for (const result of response.results) {
+      if (result.parent.type === 'workspace') {
+        const title = getPageTitle(result);
+        rootItems.push({
+          id: result.id,
+          title,
+          type: result.object,
+          parent: result.parent,
+          url: result.url,
+        });
+      }
+      pagesProcessed++;
+      updateSpinnerMessage(`Found ${pagesProcessed} pages...`);
     }
-  }
-  
-  // Also search for databases at the workspace level
-  const dbResponse = await notion.search({
-    filter: {
-      value: 'database',
-      property: 'object'
-    },
-    page_size: 100,
-  });
-  
-  for (const result of dbResponse.results) {
-    if (result.parent.type === 'workspace') {
-      const title = getDatabaseTitle(result);
-      rootItems.push({
-        id: result.id,
-        title,
-        type: result.object,
-        parent: result.parent,
-        url: result.url,
-      });
+    
+    // Also search for databases at the workspace level
+    updateSpinnerMessage('Searching for databases...');
+    const dbResponse = await notion.search({
+      filter: {
+        value: 'database',
+        property: 'object'
+      },
+      page_size: 100,
+    });
+    
+    let dbProcessed = 0;
+    for (const result of dbResponse.results) {
+      if (result.parent.type === 'workspace') {
+        const title = getDatabaseTitle(result);
+        rootItems.push({
+          id: result.id,
+          title,
+          type: result.object,
+          parent: result.parent,
+          url: result.url,
+        });
+      }
+      dbProcessed++;
+      updateSpinnerMessage(`Found ${pagesProcessed} pages and ${dbProcessed} databases...`);
     }
+  } catch (error) {
+    updateSpinnerMessage(`Error finding root items: ${error.message}`);
+    throw error;
   }
   
   return rootItems;
 }
 
+// Global counter for progress tracking
+let totalNodesProcessed = 0;
+
 // Recursively build the tree for a given node
 async function buildTreeRecursively(item) {
   const node = new TreeNode(item.id, item.title, item.type, item.url);
+  totalNodesProcessed++;
+  
+  if (totalNodesProcessed % 5 === 0) {
+    updateSpinnerMessage(`Building tree... (${totalNodesProcessed} nodes processed)`);
+  }
   
   if (item.type === 'database') {
     // For databases, fetch all pages in the database
@@ -141,6 +250,7 @@ async function fetchDatabasePages(databaseId) {
   const pages = [];
   
   try {
+    updateSpinnerMessage(`Fetching pages from database ${databaseId.substr(0, 8)}...`);
     const response = await notion.databases.query({
       database_id: databaseId,
       page_size: 100,
@@ -156,6 +266,7 @@ async function fetchDatabasePages(databaseId) {
         url: page.url,
       });
     }
+    updateSpinnerMessage(`Found ${pages.length} pages in database ${databaseId.substr(0, 8)}`);
   } catch (error) {
     console.error(chalk.yellow(`Error fetching pages from database ${databaseId}:`, error.message));
   }
@@ -170,6 +281,8 @@ async function fetchPageChildren(pageId) {
   let cursor = undefined;
   
   try {
+    updateSpinnerMessage(`Fetching children for page ${pageId.substr(0, 8)}...`);
+    
     while (hasMore) {
       const response = await notion.blocks.children.list({
         block_id: pageId,
@@ -226,6 +339,14 @@ async function fetchPageChildren(pageId) {
       
       hasMore = response.has_more;
       cursor = response.next_cursor;
+      
+      if (hasMore) {
+        updateSpinnerMessage(`Fetching more children for page ${pageId.substr(0, 8)}...`);
+      }
+    }
+    
+    if (children.length > 0) {
+      updateSpinnerMessage(`Found ${children.length} child pages/databases in page ${pageId.substr(0, 8)}`);
     }
   } catch (error) {
     console.error(chalk.yellow(`Error fetching children for page ${pageId}:`, error.message));
@@ -424,6 +545,17 @@ async function exportTreeToJSON(tree) {
     console.error(chalk.red('Error exporting tree to JSON:'), error.message);
   }
 }
+
+// Clean up spinner on exit
+process.on('exit', () => {
+  stopSpinner();
+});
+
+// Clean up spinner on ctrl+c
+process.on('SIGINT', () => {
+  stopSpinner();
+  process.exit(0);
+});
 
 // Run the main function
 exportNotionTree(); 
