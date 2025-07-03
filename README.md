@@ -1,5 +1,9 @@
 # Notion Tree Generator
 
+<img src="https://wakapi-qt1b.onrender.com/api/badge/fahad/interval:any/project:Notion-ls-tree" 
+     alt="Wakapi Time Tracking" 
+     title="Spent more than that amount of time spent on this project">
+
 This tool generates a tree-like structure of your Notion pages, similar to a Windows directory tree. It visualizes the hierarchy of your pages and databases in the console and can export the structure to files.
 
 ## Features
