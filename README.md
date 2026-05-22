@@ -191,3 +191,9 @@ The project consists of two main files:
 - The Notion API only allows access to pages that have been explicitly shared with your integration
 - The tree generation might take some time for large workspaces with many nested pages
 - API rate limits may apply for very large workspaces
+
+## Contributors
+
+<a href="https://github.com/FahadBinHussain/Notion-ls-tree/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=FahadBinHussain/Notion-ls-tree" alt="Contributors" />
+</a>
